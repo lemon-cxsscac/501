@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星座知識</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #2c3e50, #4ca1af);
+            color: #fff;
+        }
+
+        #chat-container {
+            width: 90%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 70vh;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+
+        .user {
+            align-self: flex-end;
+            background: #3498db;
+            color: white;
+            text-align: right;
+        }
+
+        .ai {
+            align-self: flex-start;
+            background: #34495e;
+            color: #ecf0f1;
+            text-align: left;
+        }
+
+        #input-container {
+            margin-top: 20px;
+            display: flex;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 20px; /* 增加內邊距，讓文字框更大 */
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 18px; /* 增加字體大小 */
+        }
+
+        #send-button {
+            padding: 15px 20px;
+            margin-left: 10px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #send-button:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <h1>星座知識</h1>
+    <p>探索十二星座的奧秘，了解你的星座特質！</p>
+
+    <div id="api-key-container" style="margin-bottom: 20px;">
+        <label for="api-key" style="display: block; margin-bottom: 5px;">輸入 Google Cloud Gemini API 金鑰：</label>
+        <input type="password" id="api-key" placeholder="輸入您的 API 金鑰" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px;">
+    </div>
+
+    <div id="chat-container"></div>
+    <div id="input-container">
+        <input type="text" id="user-input" placeholder="輸入你的星座問題...">
+        <button id="send-button">探索</button>
+    </div>
+
+    <script>
+        let apiKey = "AIzaSyClWoxD84F_8BdWfur2VYYHni54TsUnpHc";
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const apiKeyInput = document.getElementById('api-key');
+
+        const zodiacKnowledge = {
+            "牡羊座": "牡羊座的代表特質是熱情、勇敢和自信。他們通常是天生的領導者，喜歡接受挑戰。",
+            "金牛座": "金牛座的人務實、可靠，並且非常注重物質享受。他們喜歡穩定的生活方式。",
+            "雙子座": "雙子座以聰明、靈活和好奇心著稱。他們喜歡學習新事物，並且擅長溝通。",
+            "巨蟹座": "巨蟹座的人感情豐富，重視家庭和朋友。他們通常非常有同情心和保護欲。",
+            "獅子座": "獅子座的人自信、慷慨，並且喜歡成為眾人注目的焦點。他們有很強的創造力。",
+            "處女座": "處女座以細心、謹慎和追求完美著稱。他們喜歡分析問題並找到最佳解決方案。",
+            "天秤座": "天秤座的人追求平衡與和諧，並且非常注重人際關係。他們有很強的審美能力。",
+            "天蠍座": "天蠍座的人神秘、熱情，並且非常有決心。他們通常對事物有深刻的洞察力。",
+            "射手座": "射手座的人樂觀、愛冒險，並且非常熱愛自由。他們喜歡探索未知的世界。",
+            "摩羯座": "摩羯座的人務實、勤奮，並且非常有責任感。他們通常有很強的目標感。",
+            "水瓶座": "水瓶座的人創新、獨立，並且非常注重思想自由。他們喜歡挑戰傳統觀念。",
+            "雙魚座": "雙魚座的人富有想像力，感情細膩，並且非常有同情心。他們通常對藝術有很高的興趣。"
+        };
+
+        apiKeyInput.addEventListener('input', () => {
+            const newApiKey = apiKeyInput.value.trim();
+            if (newApiKey) {
+                apiKey = newApiKey;
+                console.log('API 金鑰已更新:', apiKey);
+            }
+        });
+
+        let lastRequestTime = 0;
+        const requestInterval = 30000; // 30 seconds
+
+        async function sendMessage(message) {
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
+
+            const requestBody = {
+                contents: [
+                    {
+                        parts: [
+                            { text: message }
+                        ]
+                    }
+                ]
+            };
+
+            let retries = 5;
+            while (retries > 0) {
+                try {
+                    console.log("Sending request to API with message:", message);
+
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    console.log("Received response with status:", response.status);
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        console.error("Full API Response:", errorData);
+
+                        if (response.status === 429 && errorData.error.details) {
+                            const retryInfo = errorData.error.details.find(detail => detail["@type"] === "type.googleapis.com/google.rpc.RetryInfo");
+                            if (retryInfo && retryInfo.retryDelay) {
+                                const retryDelay = parseInt(retryInfo.retryDelay.replace('s', '')) * 1000;
+                                console.warn(`Rate limit exceeded. Retrying in ${retryDelay / 1000} seconds...`);
+                                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                                retries--;
+                                continue;
+                            }
+                        }
+
+                        if (response.status === 429) {
+                            throw new Error("Rate limit exceeded. Please try again later.");
+                        }
+
+                        throw new Error(`API Error: ${response.status} - ${errorData.error.message}`);
+                    }
+
+                    const data = await response.json();
+                    console.log("Full API Response:", data);
+
+                    if (data.candidates && data.candidates.length > 0) {
+                        const candidate = data.candidates[0];
+                        if (candidate.parts && candidate.parts.length > 0) {
+                            const output = candidate.parts.map(part => part.text).join('');
+                            console.log("AI Response:", output);
+                            return output;
+                        } else if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                            const output = candidate.content.parts.map(part => part.text).join('');
+                            console.log("AI Response from content.parts:", output);
+                            return output;
+                        } else if (candidate.text) {
+                            console.warn("伺服器回應的 parts 為空，但存在 text 屬性。完整回應：", JSON.stringify(data, null, 2));
+                            return candidate.text;
+                        } else if (candidate.content) {
+                            console.warn("伺服器回應的 parts 和 text 為空，但存在 content 屬性。完整回應：", JSON.stringify(data, null, 2));
+                            return candidate.content;
+                        } else {
+                            console.warn("伺服器回應的 candidates 存在，但 parts、text 和 content 為空或不存在。完整回應：", JSON.stringify(data, null, 2));
+                            return "伺服器回應中沒有可用的內容，請稍後再試。";
+                        }
+                    } else {
+                        console.error("伺服器回應結構異常，無法找到 candidates。完整回應：", JSON.stringify(data, null, 2));
+                        throw new Error("伺服器回應結構異常，請檢查伺服器設定。");
+                    }
+                } catch (error) {
+                    console.error("Error during API request:", error);
+                    if (retries <= 1) {
+                        // 如果伺服器無法回應，嘗試從本地知識庫中提取內容
+                        const zodiac = Object.keys(zodiacKnowledge).find(z => message.includes(z));
+                        if (zodiac) {
+                            console.log("從本地知識庫中提取星座資訊：", zodiacKnowledge[zodiac]);
+                            return zodiacKnowledge[zodiac];
+                        }
+                        throw new Error(`無法從 AI 獲得回應。詳細錯誤：${error.message}`);
+                    }
+                }
+            }
+        }
+
+        function appendMessage(content, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = content;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        sendButton.addEventListener('click', async () => {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            appendMessage(message, 'user');
+            userInput.value = '';
+
+            try {
+                const reply = await sendMessage(message);
+                appendMessage(reply, 'ai');
+            } catch (error) {
+                appendMessage("Error: 無法從 AI 獲得回應。", 'ai');
+            }
+        });
+
+        userInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+    </script>
+</body>
+</html>
